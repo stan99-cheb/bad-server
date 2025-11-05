@@ -17,15 +17,14 @@ const { PORT = 3000 } = process.env
 const app = express()
 app.set('trust proxy', 1)
 
-// Rate limiting middleware (100 запросов за 15 минут с одного IP)
-const limiter = rateLimit({
+// Rate limiting middleware (10 запросов за 15 минут с одного IP)
+app.use(rateLimit({
     windowMs: 15 * 60 * 1000, // 15 минут
-    max: 100, // лимит на 100 запросов
+    max: 10, // лимит на 100 запросов
     standardHeaders: true,
     legacyHeaders: false,
-    message: 'Слишком много запросов с этого IP, попробуйте позже.'
-})
-app.use(limiter)
+    message: 'Слишком много запросов с этого IP, попробуйте позже'
+}))
 
 app.use(cookieParser())
 // app.use(cors())
