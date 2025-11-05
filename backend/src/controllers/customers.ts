@@ -3,6 +3,7 @@ import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
+import escapeRegExp from '../utils/escapeRegExp'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -29,70 +30,87 @@ export const getCustomers = async (
             search,
         } = req.query
 
+        const unsafeQueryKeys = Object.keys(req.query).filter((k) => k.startsWith('$'))
+        if (unsafeQueryKeys.length) {
+            unsafeQueryKeys.forEach((k) => delete (req.query as any)[k])
+        }
+
         const filters: FilterQuery<Partial<IUser>> = {}
 
-        if (registrationDateFrom) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $gte: new Date(registrationDateFrom as string),
+        if (registrationDateFrom && typeof registrationDateFrom === 'string') {
+            const d = new Date(registrationDateFrom)
+            if (!Number.isNaN(d.getTime())) {
+                filters.createdAt = {
+                    ...filters.createdAt,
+                    $gte: d,
+                }
             }
         }
 
-        if (registrationDateTo) {
-            const endOfDay = new Date(registrationDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
-            filters.createdAt = {
-                ...filters.createdAt,
-                $lte: endOfDay,
+        if (registrationDateTo && typeof registrationDateTo === 'string') {
+            const endOfDay = new Date(registrationDateTo)
+            if (!Number.isNaN(endOfDay.getTime())) {
+                endOfDay.setHours(23, 59, 59, 999)
+                filters.createdAt = {
+                    ...filters.createdAt,
+                    $lte: endOfDay,
+                }
             }
         }
 
-        if (lastOrderDateFrom) {
-            filters.lastOrderDate = {
-                ...filters.lastOrderDate,
-                $gte: new Date(lastOrderDateFrom as string),
+        if (lastOrderDateFrom && typeof lastOrderDateFrom === 'string') {
+            const d = new Date(lastOrderDateFrom)
+            if (!Number.isNaN(d.getTime())) {
+                filters.lastOrderDate = {
+                    ...filters.lastOrderDate,
+                    $gte: d,
+                }
             }
         }
 
-        if (lastOrderDateTo) {
-            const endOfDay = new Date(lastOrderDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
-            filters.lastOrderDate = {
-                ...filters.lastOrderDate,
-                $lte: endOfDay,
+        if (lastOrderDateTo && typeof lastOrderDateTo === 'string') {
+            const endOfDay = new Date(lastOrderDateTo)
+            if (!Number.isNaN(endOfDay.getTime())) {
+                endOfDay.setHours(23, 59, 59, 999)
+                filters.lastOrderDate = {
+                    ...filters.lastOrderDate,
+                    $lte: endOfDay,
+                }
             }
         }
 
-        if (totalAmountFrom) {
+        if (totalAmountFrom && typeof totalAmountFrom === 'string' && !Number.isNaN(Number(totalAmountFrom))) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $gte: Number(totalAmountFrom),
             }
         }
 
-        if (totalAmountTo) {
+        if (totalAmountTo && typeof totalAmountTo === 'string' && !Number.isNaN(Number(totalAmountTo))) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $lte: Number(totalAmountTo),
             }
         }
 
-        if (orderCountFrom) {
+        if (orderCountFrom && typeof orderCountFrom === 'string' && !Number.isNaN(Number(orderCountFrom))) {
             filters.orderCount = {
                 ...filters.orderCount,
                 $gte: Number(orderCountFrom),
             }
         }
 
-        if (orderCountTo) {
+        if (orderCountTo && typeof orderCountTo === 'string' && !Number.isNaN(Number(orderCountTo))) {
             filters.orderCount = {
                 ...filters.orderCount,
                 $lte: Number(orderCountTo),
             }
         }
 
-        if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+        if (search && typeof search === 'string') {
+            const safeSearch = escapeRegExp(search)
+            const searchRegex = new RegExp(safeSearch, 'i')
+
             const orders = await Order.find(
                 {
                     $or: [{ deliveryAddress: searchRegex }],
@@ -110,8 +128,10 @@ export const getCustomers = async (
 
         const sort: { [key: string]: any } = {}
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (sortField && sortOrder && typeof sortField === 'string' && typeof sortOrder === 'string') {
+            if (!sortField.startsWith('$')) {
+                sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+            }
         }
 
         const options = {

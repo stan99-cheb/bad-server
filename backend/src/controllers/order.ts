@@ -5,6 +5,7 @@ import NotFoundError from '../errors/not-found-error'
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
+import escapeRegExp from '../utils/escapeRegExp'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -28,42 +29,48 @@ export const getOrders = async (
             search,
         } = req.query
 
-        const filters: FilterQuery<Partial<IOrder>> = {}
-
-        if (status) {
-            if (typeof status === 'object') {
-                Object.assign(filters, status)
-            }
-            if (typeof status === 'string') {
-                filters.status = status
-            }
+        const unsafeQueryKeys = Object.keys(req.query).filter((k) => k.startsWith('$'))
+        if (unsafeQueryKeys.length) {
+            unsafeQueryKeys.forEach((k) => delete (req.query as any)[k])
         }
 
-        if (totalAmountFrom) {
+        const filters: FilterQuery<Partial<IOrder>> = {}
+
+        if (status && typeof status === 'string') {
+            filters.status = status
+        }
+
+        if (totalAmountFrom && typeof totalAmountFrom === 'string' && !Number.isNaN(Number(totalAmountFrom))) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $gte: Number(totalAmountFrom),
             }
         }
 
-        if (totalAmountTo) {
+        if (totalAmountTo && typeof totalAmountTo === 'string' && !Number.isNaN(Number(totalAmountTo))) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $lte: Number(totalAmountTo),
             }
         }
 
-        if (orderDateFrom) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $gte: new Date(orderDateFrom as string),
+        if (orderDateFrom && typeof orderDateFrom === 'string') {
+            const d = new Date(orderDateFrom)
+            if (!Number.isNaN(d.getTime())) {
+                filters.createdAt = {
+                    ...filters.createdAt,
+                    $gte: d,
+                }
             }
         }
 
-        if (orderDateTo) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $lte: new Date(orderDateTo as string),
+        if (orderDateTo && typeof orderDateTo === 'string') {
+            const d = new Date(orderDateTo)
+            if (!Number.isNaN(d.getTime())) {
+                filters.createdAt = {
+                    ...filters.createdAt,
+                    $lte: d,
+                }
             }
         }
 
@@ -89,8 +96,9 @@ export const getOrders = async (
             { $unwind: '$products' },
         ]
 
-        if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+        if (search && typeof search === 'string') {
+            const safeSearch = escapeRegExp(search)
+            const searchRegex = new RegExp(safeSearch, 'i')
             const searchNumber = Number(search)
 
             const searchConditions: any[] = [{ 'products.title': searchRegex }]
@@ -110,8 +118,10 @@ export const getOrders = async (
 
         const sort: { [key: string]: any } = {}
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (sortField && sortOrder && typeof sortField === 'string' && typeof sortOrder === 'string') {
+            if (!sortField.startsWith('$')) {
+                sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+            }
         }
 
         aggregatePipeline.push(
