@@ -5,6 +5,7 @@ import NotFoundError from '../errors/not-found-error'
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
+import escapeRegExp from '../utils/escapeRegExp'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -28,42 +29,65 @@ export const getOrders = async (
             search,
         } = req.query
 
-        const filters: FilterQuery<Partial<IOrder>> = {}
+        const normalizedLimit = Math.min(Number(limit) || 10, 10);
+        const normalizedPage = Number(page) || 1;
 
-        if (status) {
-            if (typeof status === 'object') {
-                Object.assign(filters, status)
-            }
-            if (typeof status === 'string') {
-                filters.status = status
-            }
+        const containsDollarKeys = (obj: any): boolean => {
+            if (!obj || typeof obj !== 'object') return false
+            return Object.keys(obj).some((key) => {
+                if (key.startsWith('$')) return true
+                try {
+                    return containsDollarKeys(obj[key])
+                } catch (e) {
+                    return false
+                }
+            })
         }
 
-        if (totalAmountFrom) {
+        if (containsDollarKeys(req.query)) {
+            return res.status(400).json({
+                error: 'Некорректные параметры запроса',
+                details: 'Параметры запроса не должны содержать ключи, начинающиеся с $.'
+            })
+        }
+
+        const filters: FilterQuery<Partial<IOrder>> = {}
+
+        if (status && typeof status === 'string') {
+            filters.status = status
+        }
+
+        if (totalAmountFrom && typeof totalAmountFrom === 'string' && !Number.isNaN(Number(totalAmountFrom))) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $gte: Number(totalAmountFrom),
             }
         }
 
-        if (totalAmountTo) {
+        if (totalAmountTo && typeof totalAmountTo === 'string' && !Number.isNaN(Number(totalAmountTo))) {
             filters.totalAmount = {
                 ...filters.totalAmount,
                 $lte: Number(totalAmountTo),
             }
         }
 
-        if (orderDateFrom) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $gte: new Date(orderDateFrom as string),
+        if (orderDateFrom && typeof orderDateFrom === 'string') {
+            const d = new Date(orderDateFrom)
+            if (!Number.isNaN(d.getTime())) {
+                filters.createdAt = {
+                    ...filters.createdAt,
+                    $gte: d,
+                }
             }
         }
 
-        if (orderDateTo) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $lte: new Date(orderDateTo as string),
+        if (orderDateTo && typeof orderDateTo === 'string') {
+            const d = new Date(orderDateTo)
+            if (!Number.isNaN(d.getTime())) {
+                filters.createdAt = {
+                    ...filters.createdAt,
+                    $lte: d,
+                }
             }
         }
 
@@ -89,8 +113,9 @@ export const getOrders = async (
             { $unwind: '$products' },
         ]
 
-        if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+        if (search && typeof search === 'string') {
+            const safeSearch = escapeRegExp(search)
+            const searchRegex = new RegExp(safeSearch, 'i')
             const searchNumber = Number(search)
 
             const searchConditions: any[] = [{ 'products.title': searchRegex }]
@@ -108,16 +133,19 @@ export const getOrders = async (
             filters.$or = searchConditions
         }
 
+        const allowedSortFields = new Set(['createdAt', 'totalAmount', 'orderNumber', 'status'])
         const sort: { [key: string]: any } = {}
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (sortField && sortOrder && typeof sortField === 'string' && typeof sortOrder === 'string') {
+            if (!sortField.startsWith('$') && allowedSortFields.has(sortField)) {
+                sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+            }
         }
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (normalizedPage - 1) * normalizedLimit },
+            { $limit: normalizedLimit },
             {
                 $group: {
                     _id: '$_id',
@@ -129,21 +157,21 @@ export const getOrders = async (
                     createdAt: { $first: '$createdAt' },
                 },
             }
-        )
+        );
 
-        const orders = await Order.aggregate(aggregatePipeline)
-        const totalOrders = await Order.countDocuments(filters)
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const orders = await Order.aggregate(aggregatePipeline);
+        const totalOrders = await Order.countDocuments(filters);
+        const totalPages = Math.ceil(totalOrders / normalizedLimit);
 
         res.status(200).json({
             orders,
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: normalizedPage,
+                pageSize: normalizedLimit,
             },
-        })
+        });
     } catch (error) {
         next(error)
     }
@@ -193,7 +221,7 @@ export const getOrdersCurrentUser = async (
             orders = orders.filter((order) => {
                 // eslint-disable-next-line max-len
                 const matchesProductTitle = order.products.some((product) =>
-                    productIds.some((id) => id.equals(product._id))
+                    productIds.some((id) => (id as Types.ObjectId).equals((product._id as Types.ObjectId)))
                 )
                 // eslint-disable-next-line max-len
                 const matchesOrderNumber =
@@ -295,7 +323,7 @@ export const createOrder = async (
             req.body
 
         items.forEach((id: Types.ObjectId) => {
-            const product = products.find((p) => p._id.equals(id))
+            const product = products.find((p) => (p._id as Types.ObjectId).equals(id))
             if (!product) {
                 throw new BadRequestError(`Товар с id ${id} не найден`)
             }

@@ -30,9 +30,11 @@ export type ApiListResponse<Type> = {
     items: Type[]
 }
 
+
 class Api {
     private readonly baseUrl: string
     protected options: RequestInit
+    private csrfToken: string | null = null
 
     constructor(baseUrl: string, options: RequestInit = {}) {
         this.baseUrl = baseUrl
@@ -40,17 +42,28 @@ class Api {
             headers: {
                 ...((options.headers as object) ?? {}),
             },
-        }
+        };
+    }
+
+    protected async getCsrfToken(): Promise<string> {
+        if (this.csrfToken) return this.csrfToken;
+        const data = await this.request<{ csrfToken: string }>('/csrf-token', {
+            method: 'GET',
+            credentials: 'include',
+        });
+        if (!data.csrfToken) throw new Error('CSRF token not found');
+        this.csrfToken = data.csrfToken;
+        return this.csrfToken;
     }
 
     protected handleResponse<T>(response: Response): Promise<T> {
         return response.ok
             ? response.json()
             : response
-                  .json()
-                  .then((err) =>
-                      Promise.reject({ ...err, statusCode: response.status })
-                  )
+                .json()
+                .then((err) =>
+                    Promise.reject({ ...err, statusCode: response.status })
+                )
     }
 
     protected async request<T>(endpoint: string, options: RequestInit) {
@@ -146,27 +159,32 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
         }))
     }
 
-    createOrder = (order: IOrder): Promise<IOrderResult> => {
+    createOrder = async (order: IOrder): Promise<IOrderResult> => {
+        const csrfToken = await this.getCsrfToken()
         return this.requestWithRefresh<IOrderResult>('/order', {
             method: 'POST',
             body: JSON.stringify(order),
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                'X-CSRF-Token': csrfToken,
             },
-        }).then((data: IOrderResult) => data)
+        })
     }
 
-    updateOrderStatus = (
+    updateOrderStatus = async (
         status: StatusType,
         orderNumber: string
     ): Promise<IOrderResult> => {
+        const csrfToken = await this.getCsrfToken()
         return this.requestWithRefresh<IOrderResult>(`/order/${orderNumber}`, {
             method: 'PATCH',
             body: JSON.stringify({ status }),
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                'X-CSRF-Token': csrfToken,
             },
         })
     }
@@ -298,22 +316,24 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
         })
     }
 
-    createProduct = (data: Omit<IProduct, '_id'>) => {
-        console.log(data)
-        return this.requestWithRefresh<IProduct>('/product', {
+    createProduct = async (data: Omit<IProduct, '_id'>) => {
+        const csrfToken = await this.getCsrfToken()
+        const result = await this.requestWithRefresh<IProduct>('/product', {
             method: 'POST',
             body: JSON.stringify(data),
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                'X-CSRF-Token': csrfToken,
             },
-        }).then((data: IProduct) => ({
-            ...data,
+        })
+        return {
+            ...result,
             image: {
-                ...data.image,
-                fileName: this.cdn + data.image.fileName,
+                ...result.image,
+                fileName: this.cdn + result.image.fileName,
             },
-        }))
+        }
     }
 
     uploadFile = (data: FormData) => {
@@ -329,28 +349,33 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
         }))
     }
 
-    updateProduct = (data: Partial<Omit<IProduct, '_id'>>, id: string) => {
-        return this.requestWithRefresh<IProduct>(`/product/${id}`, {
+    updateProduct = async (data: Partial<Omit<IProduct, '_id'>>, id: string) => {
+        const csrfToken = await this.getCsrfToken()
+        const result = await this.requestWithRefresh<IProduct>(`/product/${id}`, {
             method: 'PATCH',
             body: JSON.stringify(data),
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                'X-CSRF-Token': csrfToken,
             },
-        }).then((data: IProduct) => ({
-            ...data,
+        })
+        return {
+            ...result,
             image: {
-                ...data.image,
-                fileName: this.cdn + data.image.fileName,
+                ...result.image,
+                fileName: this.cdn + result.image.fileName,
             },
-        }))
+        }
     }
 
-    deleteProduct = (id: string) => {
+    deleteProduct = async (id: string) => {
+        const csrfToken = await this.getCsrfToken();
         return this.requestWithRefresh<IProduct>(`/product/${id}`, {
             method: 'DELETE',
             headers: {
                 Authorization: `Bearer ${getCookie('accessToken')}`,
+                'X-CSRF-Token': csrfToken,
             },
         })
     }

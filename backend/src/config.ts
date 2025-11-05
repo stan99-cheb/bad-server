@@ -22,3 +22,4 @@ export const REFRESH_TOKEN = {
         } as CookieOptions,
     },
 }
+export const { ORIGIN_ALLOW } = process.env

@@ -1,8 +1,9 @@
 import { Joi, celebrate } from 'celebrate'
 import { Types } from 'mongoose'
+import sanitizeHtml from 'sanitize-html'
 
 // eslint-disable-next-line no-useless-escape
-export const phoneRegExp = /^(\+\d+)?(?:\s|-?|\(?\d+\)?)+$/
+export const phoneRegExp = /^(\+7|8)?[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}$/
 
 export enum PaymentType {
     Card = 'card',
@@ -15,6 +16,9 @@ export const validateOrderBody = celebrate({
         items: Joi.array()
             .items(
                 Joi.string().custom((value, helpers) => {
+                    if (typeof value !== 'string') {
+                        return helpers.message({ custom: 'Элемент items должен быть строкой' })
+                    }
                     if (Types.ObjectId.isValid(value)) {
                         return value
                     }
@@ -44,7 +48,7 @@ export const validateOrderBody = celebrate({
         total: Joi.number().required().messages({
             'string.empty': 'Не указана сумма заказа',
         }),
-        comment: Joi.string().optional().allow(''),
+        comment: Joi.string().optional().allow('').custom((value) => sanitizeHtml(value)),
     }),
 })
 

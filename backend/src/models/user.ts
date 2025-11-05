@@ -25,6 +25,7 @@ export interface IUser extends Document {
     orders: Types.ObjectId[]
     lastOrderDate: Date | null
     lastOrder: Types.ObjectId | null
+    _id: Types.ObjectId
 }
 
 interface IUserMethods {
@@ -105,7 +106,7 @@ const userSchema = new mongoose.Schema<IUser, IUserModel, IUserMethods>(
         // Возможно удаление пароля в контроллере создания, т.к. select: false не работает в случае создания сущности https://mongoosejs.com/docs/api/document.html#Document.prototype.toJSON()
         toJSON: {
             virtuals: true,
-            transform: (_doc, ret) => {
+            transform: (_doc, ret: any) => {
                 delete ret.tokens
                 delete ret.password
                 delete ret._id
@@ -130,8 +131,8 @@ userSchema.pre('save', async function hashingPassword(next) {
 
 // Можно лучше: централизованное создание accessToken и  refresh токена
 
-userSchema.methods.generateAccessToken = function generateAccessToken() {
-    const user = this
+userSchema.methods.generateAccessToken = function generateAccessToken(this: any) {
+    const user = this as HydratedDocument<IUser, IUserMethods>
     // Создание accessToken токена возможно в контроллере авторизации
     return jwt.sign(
         {
@@ -147,8 +148,8 @@ userSchema.methods.generateAccessToken = function generateAccessToken() {
 }
 
 userSchema.methods.generateRefreshToken =
-    async function generateRefreshToken() {
-        const user = this
+    async function generateRefreshToken(this: any) {
+        const user = this as HydratedDocument<IUser, IUserMethods>
         // Создание refresh токена возможно в контроллере авторизации/регистрации
         const refreshToken = jwt.sign(
             {
@@ -190,8 +191,8 @@ userSchema.statics.findUserByCredentials = async function findByCredentials(
     return user
 }
 
-userSchema.methods.calculateOrderStats = async function calculateOrderStats() {
-    const user = this
+userSchema.methods.calculateOrderStats = async function calculateOrderStats(this: any) {
+    const user = this as HydratedDocument<IUser, IUserMethods>
     const orderStats = await mongoose.model('order').aggregate([
         { $match: { customer: user._id } },
         {
