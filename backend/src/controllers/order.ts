@@ -32,9 +32,12 @@ export const getOrders = async (
         const normalizedLimit = Math.min(Number(limit) || 10, 10);
         const normalizedPage = Number(page) || 1;
 
-        const unsafeQueryKeys = Object.keys(req.query).filter((k) => k.startsWith('$'))
+        const unsafeQueryKeys = Object.keys(req.query).filter((k) => k.startsWith('$'));
         if (unsafeQueryKeys.length) {
-            unsafeQueryKeys.forEach((k) => delete (req.query as any)[k])
+            return res.status(400).json({
+                error: 'Некорректные параметры запроса',
+                details: 'Параметры запроса не должны содержать ключи, начинающиеся с $.'
+            });
         }
 
         const filters: FilterQuery<Partial<IOrder>> = {}
