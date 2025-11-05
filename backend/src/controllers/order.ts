@@ -29,6 +29,9 @@ export const getOrders = async (
             search,
         } = req.query
 
+        const normalizedLimit = Math.min(Number(limit) || 10, 10);
+        const normalizedPage = Number(page) || 1;
+
         const unsafeQueryKeys = Object.keys(req.query).filter((k) => k.startsWith('$'))
         if (unsafeQueryKeys.length) {
             unsafeQueryKeys.forEach((k) => delete (req.query as any)[k])
@@ -126,8 +129,8 @@ export const getOrders = async (
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (normalizedPage - 1) * normalizedLimit },
+            { $limit: normalizedLimit },
             {
                 $group: {
                     _id: '$_id',
@@ -139,21 +142,21 @@ export const getOrders = async (
                     createdAt: { $first: '$createdAt' },
                 },
             }
-        )
+        );
 
-        const orders = await Order.aggregate(aggregatePipeline)
-        const totalOrders = await Order.countDocuments(filters)
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const orders = await Order.aggregate(aggregatePipeline);
+        const totalOrders = await Order.countDocuments(filters);
+        const totalPages = Math.ceil(totalOrders / normalizedLimit);
 
         res.status(200).json({
             orders,
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: normalizedPage,
+                pageSize: normalizedLimit,
             },
-        })
+        });
     } catch (error) {
         next(error)
     }
