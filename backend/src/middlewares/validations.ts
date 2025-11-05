@@ -1,5 +1,6 @@
 import { Joi, celebrate } from 'celebrate'
 import { Types } from 'mongoose'
+import sanitizeHtml from 'sanitize-html'
 
 // eslint-disable-next-line no-useless-escape
 export const phoneRegExp = /^(\+\d+)?(?:\s|-?|\(?\d+\)?)+$/
@@ -44,7 +45,7 @@ export const validateOrderBody = celebrate({
         total: Joi.number().required().messages({
             'string.empty': 'Не указана сумма заказа',
         }),
-        comment: Joi.string().optional().allow(''),
+        comment: Joi.string().optional().allow('').custom((value) => sanitizeHtml(value)),
     }),
 })
 
