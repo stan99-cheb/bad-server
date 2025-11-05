@@ -1,17 +1,26 @@
+
 import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import { Error as MongooseError } from 'mongoose'
 import { join } from 'path'
+import NodeCache from 'node-cache'
 import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import Product from '../models/product'
 import movingFile from '../utils/movingFile'
 
+const productCache = new NodeCache({ stdTTL: 60, checkperiod: 120 })
+
 // GET /product
 const getProducts = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { page = 1, limit = 5 } = req.query
+        const cacheKey = `products:${page}:${limit}`
+        const cached = productCache.get(cacheKey)
+        if (cached) {
+            return res.send(cached)
+        }
         const options = {
             skip: (Number(page) - 1) * Number(limit),
             limit: Number(limit),
@@ -19,7 +28,7 @@ const getProducts = async (req: Request, res: Response, next: NextFunction) => {
         const products = await Product.find({}, null, options)
         const totalProducts = await Product.countDocuments({})
         const totalPages = Math.ceil(totalProducts / Number(limit))
-        return res.send({
+        const response = {
             items: products,
             pagination: {
                 totalProducts,
@@ -27,7 +36,9 @@ const getProducts = async (req: Request, res: Response, next: NextFunction) => {
                 currentPage: Number(page),
                 pageSize: Number(limit),
             },
-        })
+        }
+        productCache.set(cacheKey, response)
+        return res.send(response)
     } catch (err) {
         return next(err)
     }

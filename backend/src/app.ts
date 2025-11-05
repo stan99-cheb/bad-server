@@ -1,3 +1,4 @@
+
 import { errors } from 'celebrate'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
@@ -5,16 +6,27 @@ import 'dotenv/config'
 import express, { json, urlencoded } from 'express'
 import mongoose from 'mongoose'
 import path from 'path'
+import rateLimit from 'express-rate-limit'
 import { DB_ADDRESS } from './config'
 import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
 
 const { PORT = 3000 } = process.env
+
 const app = express()
 
-app.use(cookieParser())
+// Rate limiting middleware (100 запросов за 15 минут с одного IP)
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 минут
+    max: 100, // лимит на 100 запросов
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Слишком много запросов с этого IP, попробуйте позже.'
+})
+app.use(limiter)
 
+app.use(cookieParser())
 app.use(cors())
 // app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }));
 // app.use(express.static(path.join(__dirname, 'public')));
