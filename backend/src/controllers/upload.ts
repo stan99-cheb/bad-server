@@ -11,6 +11,12 @@ export const uploadFile = async (
     if (!req.file) {
         return next(new BadRequestError('Файл не загружен'))
     }
+
+    const MIN_FILE_SIZE = 2 * 1024
+    if (typeof req.file.size === 'number' && req.file.size < MIN_FILE_SIZE) {
+        return next(new BadRequestError('Размер файла слишком мал'))
+    }
+
     try {
         const storedName = basename(req.file.filename)
         const fileName = process.env.UPLOAD_PATH
