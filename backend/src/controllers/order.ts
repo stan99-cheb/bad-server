@@ -203,7 +203,7 @@ export const getOrdersCurrentUser = async (
             orders = orders.filter((order) => {
                 // eslint-disable-next-line max-len
                 const matchesProductTitle = order.products.some((product) =>
-                    productIds.some((id) => id.equals(product._id))
+                    productIds.some((id) => (id as Types.ObjectId).equals((product._id as Types.ObjectId)))
                 )
                 // eslint-disable-next-line max-len
                 const matchesOrderNumber =
@@ -305,7 +305,7 @@ export const createOrder = async (
             req.body
 
         items.forEach((id: Types.ObjectId) => {
-            const product = products.find((p) => p._id.equals(id))
+            const product = products.find((p) => (p._id as Types.ObjectId).equals(id))
             if (!product) {
                 throw new BadRequestError(`Товар с id ${id} не найден`)
             }

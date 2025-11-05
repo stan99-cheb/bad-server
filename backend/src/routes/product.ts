@@ -6,7 +6,6 @@ import {
     updateProduct,
 } from '../controllers/products'
 import auth, { roleGuardMiddleware } from '../middlewares/auth'
-import csrf from '../middlewares/csrf'
 import {
     validateObjId,
     validateProductBody,
@@ -20,7 +19,6 @@ productRouter.get('/', getProducts)
 productRouter.post(
     '/',
     auth,
-    csrf,
     roleGuardMiddleware(Role.Admin),
     validateProductBody,
     createProduct
@@ -28,7 +26,6 @@ productRouter.post(
 productRouter.delete(
     '/:productId',
     auth,
-    csrf,
     roleGuardMiddleware(Role.Admin),
     validateObjId,
     deleteProduct
@@ -36,7 +33,6 @@ productRouter.delete(
 productRouter.patch(
     '/:productId',
     auth,
-    csrf,
     roleGuardMiddleware(Role.Admin),
     validateObjId,
     validateProductUpdateBody,
