@@ -1,9 +1,8 @@
-import { Router } from 'express'
-import { uploadFile } from '../controllers/upload'
-import fileMiddleware from '../middlewares/file'
-import { verifyCsrf } from '../middlewares/csrf'
+import { Router } from 'express';
+import { uploadFile } from '../controllers/upload';
+import fileMiddleware from '../middlewares/file';
 
 const uploadRouter = Router()
-uploadRouter.post('/', verifyCsrf, fileMiddleware.single('file'), uploadFile)
+uploadRouter.post('/', fileMiddleware.single('file'), uploadFile)
 
 export default uploadRouter

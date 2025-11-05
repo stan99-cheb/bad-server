@@ -122,10 +122,11 @@ export const getOrders = async (
             filters.$or = searchConditions
         }
 
+        const allowedSortFields = new Set(['createdAt', 'totalAmount', 'orderNumber', 'status'])
         const sort: { [key: string]: any } = {}
 
         if (sortField && sortOrder && typeof sortField === 'string' && typeof sortOrder === 'string') {
-            if (!sortField.startsWith('$')) {
+            if (!sortField.startsWith('$') && allowedSortFields.has(sortField)) {
                 sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
             }
         }

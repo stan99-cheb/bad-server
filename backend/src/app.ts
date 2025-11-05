@@ -19,7 +19,7 @@ app.set('trust proxy', 1)
 // Rate limiting middleware (10 запросов за 15 минут с одного IP)
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000, // 15 минут
-    max: 100, // лимит на 10 запросов
+    max: 10, // лимит на 10 запросов
     standardHeaders: true,
     legacyHeaders: false,
     message: 'Слишком много запросов с этого IP, попробуйте позже'

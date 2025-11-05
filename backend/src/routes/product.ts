@@ -21,8 +21,8 @@ productRouter.post(
     '/',
     auth,
     roleGuardMiddleware(Role.Admin),
-    verifyCsrf,
     validateProductBody,
+    verifyCsrf,
     createProduct
 )
 productRouter.delete(
@@ -37,9 +37,9 @@ productRouter.patch(
     '/:productId',
     auth,
     roleGuardMiddleware(Role.Admin),
-    verifyCsrf,
     validateObjId,
     validateProductUpdateBody,
+    verifyCsrf,
     updateProduct
 )
 
